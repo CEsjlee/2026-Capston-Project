@@ -1,0 +1,300 @@
+import { useState, useEffect } from 'react';
+import styled from 'styled-components';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios'; 
+
+const Roadmap = () => {
+  const navigate = useNavigate();
+
+  const [inputs, setInputs] = useState({ 
+    major: '', grade: '', targetJob: '', currentSpecs: '', courses: '',      
+    projects: '', gpa: '', language: '', targetCompany: '', techStacks: ''     
+  });
+  
+  const [resultData, setResultData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // ✅ 초기 데이터 로드 (DB 데이터 + 실시간 뉴스 불러오기)
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        // 1. DB에서 저장된 로드맵 정보 가져오기
+        const response = await api.get('/api/major/my-roadmap');
+        
+        if (response.data) {
+          // 입력값 복구
+          setInputs(response.data);
+          localStorage.setItem('roadmapInputs', JSON.stringify(response.data));
+
+          // 2. 분석 결과가 있다면 복구
+          if (response.data.analysisResult) {
+            const parsedResult = JSON.parse(response.data.analysisResult);
+            
+            // ★ [핵심 수정] DB에는 뉴스가 없으므로, 여기서 다시 불러와서 채워넣음!
+            if (response.data.targetJob) {
+                try {
+                    const keyword = encodeURIComponent(response.data.targetJob + " 채용");
+                    const newsRes = await api.get(`/api/news/search?keyword=${keyword}`);
+                    parsedResult.newsList = newsRes.data; // 뉴스 리스트 합치기
+                } catch (newsErr) {
+                    console.error("뉴스 로딩 실패:", newsErr);
+                    parsedResult.newsList = []; // 실패 시 빈 배열
+                }
+            }
+
+            setResultData(parsedResult);
+            localStorage.setItem('roadmapResult', JSON.stringify(parsedResult));
+          }
+        } else {
+           // DB 없음 -> 로컬 확인
+           const saved = localStorage.getItem('roadmapInputs');
+           if (saved) setInputs(JSON.parse(saved));
+        }
+      } catch (err) {
+        console.log("DB 데이터 없음, 로컬 확인");
+        const saved = localStorage.getItem('roadmapInputs');
+        if (saved) setInputs(JSON.parse(saved));
+
+        // DB 로드 실패 시, 로컬에 남아있는 결과라도 보여줌
+        const savedResult = localStorage.getItem('roadmapResult');
+        if (savedResult) setResultData(JSON.parse(savedResult));
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setInputs(prev => {
+        const updated = { ...prev, [name]: value };
+        localStorage.setItem('roadmapInputs', JSON.stringify(updated));
+        return updated;
+    });
+  };
+
+  const handleAnalyze = async () => {
+    if (!inputs.major || !inputs.grade || !inputs.targetJob) {
+      alert("전공, 학년, 목표 직무는 필수입니다!");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // 분석 요청 (이때는 백엔드가 뉴스를 포함해서 줌)
+      const response = await api.post('/api/major/analyze', inputs);
+      
+      setResultData(response.data);
+
+      localStorage.setItem('roadmapInputs', JSON.stringify(inputs)); 
+      localStorage.setItem('roadmapResult', JSON.stringify(response.data));
+
+    } catch (err) {
+      console.error(err);
+      setError("서버 연결 실패 혹은 분석 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRetry = () => { 
+    setError(null); 
+    setResultData(null); 
+    localStorage.removeItem('roadmapResult'); 
+  };
+
+  return (
+    <MainContent>
+      <PageHeader>
+        <PageTitle>🧭 AI 커리어 나침반</PageTitle>
+      </PageHeader>
+
+      {/* 로딩 화면 */}
+      {loading && !error && (
+        <LoadingContainer>
+          <Spinner />
+          <LoadingText><strong>{inputs.targetJob}</strong> 로드맵 생성 중... 🧠</LoadingText>
+        </LoadingContainer>
+      )}
+
+      {/* 입력 폼 */}
+      {!resultData && !loading && !error && (
+        <FormContainer>
+          <FormTitle>맞춤 로드맵 설정을 위한 정보 입력</FormTitle>
+          <SectionSubtitle>📍 기본 정보 (필수)</SectionSubtitle>
+          <InputRow>
+            <InputGroup style={{flex: 1.5}}>
+              <Label>전공</Label>
+              <Input name="major" placeholder="예: 컴퓨터공학과" value={inputs.major} onChange={handleChange} />
+            </InputGroup>
+            <InputGroup style={{flex: 1}}>
+              <Label>현재 학년</Label>
+              <Select name="grade" value={inputs.grade} onChange={handleChange}>
+                <option value="">선택하세요</option>
+                <option value="1학년">1학년</option><option value="2학년">2학년</option>
+                <option value="3학년">3학년</option><option value="4학년">4학년</option>
+              </Select>
+            </InputGroup>
+          </InputRow>
+          <InputGroup>
+            <Label>목표 직무</Label>
+            <Input name="targetJob" placeholder="예: 백엔드 개발자" value={inputs.targetJob} onChange={handleChange} />
+          </InputGroup>
+          <Divider />
+          <SectionSubtitle>🎯 상세 목표 및 선호도</SectionSubtitle>
+          <InputRow>
+            <InputGroup style={{flex: 1}}>
+              <Label>희망 기업 형태</Label>
+              <Input name="targetCompany" placeholder="예: 네카라쿠배, 스타트업 등" value={inputs.targetCompany} onChange={handleChange} />
+            </InputGroup>
+            <InputGroup style={{flex: 1.2}}>
+              <Label>핵심 기술 스택</Label>
+              <Input name="techStacks" placeholder="예: Java, Spring, React 등" value={inputs.techStacks} onChange={handleChange} />
+            </InputGroup>
+          </InputRow>
+          <Divider />
+          <SectionSubtitle>🎓 상세 스펙</SectionSubtitle>
+          <InputGroup>
+            <Label>기수강 핵심 과목</Label>
+            <TextArea name="courses" placeholder="이미 수강한 전공 과목을 적어주세요." value={inputs.courses} onChange={handleChange} $height="60px" />
+          </InputGroup>
+          <InputRow>
+            <InputGroup style={{flex: 1}}><Label>현재 학점</Label><Input name="gpa" value={inputs.gpa} onChange={handleChange} /></InputGroup>
+            <InputGroup style={{flex: 1}}><Label>어학 성적</Label><Input name="language" value={inputs.language} onChange={handleChange} /></InputGroup>
+          </InputRow>
+          <InputGroup>
+            <Label>프로젝트 및 대외활동</Label>
+            <TextArea name="projects" placeholder="경험하신 프로젝트나 활동을 적어주세요." value={inputs.projects} onChange={handleChange} $height="80px" />
+          </InputGroup>
+          <InputGroup>
+            <Label>보유 자격증 및 기타</Label>
+            <Input name="currentSpecs" placeholder="예: 정보처리기사" value={inputs.currentSpecs} onChange={handleChange} />
+          </InputGroup>
+          <AnalyzeButton onClick={handleAnalyze}>🚀 AI 로드맵 생성하기</AnalyzeButton>
+        </FormContainer>
+      )}
+
+      {/* 결과 화면 */}
+      {resultData && (
+        <>
+          <GoalSection>
+            <GoalTitle>🎯 목표 직군</GoalTitle>
+            <GoalText>{resultData.interest || inputs.targetJob}</GoalText>
+            <TopButton onClick={handleRetry}>🔄 다시 설정</TopButton>
+          </GoalSection>
+
+          <SectionTitle>🚀 남은 대학생활 로드맵 (현재 시점 이후)</SectionTitle>
+          <ScrollContainer>
+            {resultData.semesterPlans && resultData.semesterPlans.length > 0 ? (
+              resultData.semesterPlans.map((sem, index) => (
+                <RoadmapCard key={index}>
+                  <CardHeader>
+                    <CardHeaderBadge>{index + 1}</CardHeaderBadge>
+                    <CardTitle>{sem.grade}</CardTitle>
+                  </CardHeader>
+                  <CardInnerStack>
+                    <InfoBlock>
+                      <SubHeader>🔥 핵심 목표</SubHeader>
+                      <List>{sem.goal && sem.goal.map((t, i) => <li key={i}>{t}</li>)}</List>
+                    </InfoBlock>
+                    <InfoBlock>
+                      <SubHeader>📚 추천 과목</SubHeader>
+                      <SubjectWrap>{sem.courses && sem.courses.map((t, i) => <SubjectBadge key={i}>{t}</SubjectBadge>)}</SubjectWrap>
+                    </InfoBlock>
+                    <InfoBlock>
+                      <SubHeader>🏃 추천 활동</SubHeader>
+                      <List $check>{sem.activities && sem.activities.map((t, i) => <li key={i}>{t}</li>)}</List>
+                    </InfoBlock>
+                  </CardInnerStack>
+                </RoadmapCard>
+              ))
+            ) : (
+               <EmptyBox>로드맵 데이터가 없습니다.</EmptyBox>
+            )}
+          </ScrollContainer>
+
+          <SectionTitle>📈 역량 분석 및 AI 조언</SectionTitle>
+          <GapCard>
+            <GapGrid>
+              <div>
+                <GapHeader className="green">● 현재 보유 역량</GapHeader>
+                <p style={{color: '#555', fontSize: '15px'}}>{resultData.gaps?.owned?.join(', ') || "정보 없음"}</p>
+              </div>
+              <div>
+                <GapHeader className="orange">● 보완 필요 역량</GapHeader>
+                {resultData.gaps?.missing?.map((item, i) => (
+                  <GapItem key={i}><strong>{item.name}</strong><span>{item.method}</span></GapItem>
+                ))}
+              </div>
+            </GapGrid>
+            <AiFeedback><strong>💡 AI 상세 컨설팅</strong><p>{resultData.gaps?.aiFeedback}</p></AiFeedback>
+          </GapCard>
+
+          <SectionTitle>📰 관련 채용 뉴스</SectionTitle>
+          {resultData.newsList && resultData.newsList.length > 0 ? (
+            <NewsGrid>
+              {resultData.newsList.map((news, index) => (
+                <NewsCard key={index} href={news.link} target="_blank" rel="noopener noreferrer">
+                  <h4>{news.title}</h4>
+                  <span>기사 보기 ↗</span>
+                </NewsCard>
+              ))}
+            </NewsGrid>
+          ) : (
+            <EmptyBox>관련 뉴스를 찾을 수 없습니다.</EmptyBox>
+          )}
+          <FooterSpacer />
+        </>
+      )}
+    </MainContent>
+  );
+};
+
+export default Roadmap;
+
+// --- CSS (기존 유지) ---
+const MainContent = styled.div` flex: 1; padding: 40px; overflow-y: auto; height: 100vh; box-sizing: border-box; background-color: #f8f9fa; display: flex; flex-direction: column; align-items: center; `;
+const PageHeader = styled.div` width: 100%; max-width: 1000px; margin-bottom: 30px; `;
+const PageTitle = styled.h2` font-size: 24px; color: #333; font-weight: bold; `;
+const SectionSubtitle = styled.h4` font-size: 15px; color: #a855f7; margin-bottom: 15px; text-align: left; width: 100%; `;
+const Divider = styled.div` height: 1px; background: #eee; margin: 25px 0; width: 100%; `;
+const FormContainer = styled.div` width: 100%; max-width: 600px; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); `;
+const FormTitle = styled.h2` font-size: 20px; margin-bottom: 25px; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; text-align: left; `;
+const InputGroup = styled.div` margin-bottom: 20px; text-align: left; width: 100%; `;
+const InputRow = styled.div` display: flex; gap: 15px; width: 100%; `;
+const Label = styled.label` display: block; font-size: 14px; font-weight: bold; color: #555; margin-bottom: 8px; `;
+const Input = styled.input` width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; `;
+const Select = styled.select` width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 10px; background: white; `;
+const TextArea = styled.textarea` width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 10px; height: ${props => props.$height || '100px'}; resize: none; box-sizing: border-box; `;
+const AnalyzeButton = styled.button` width: 100%; background: #a855f7; color: white; padding: 16px; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; `;
+const GoalSection = styled.div` width: 100%; max-width: 1000px; background: #fdf4ff; border: 1px solid #f0abfc; padding: 20px; border-radius: 12px; margin-bottom: 40px; display: flex; align-items: center; box-sizing: border-box; `;
+const GoalTitle = styled.h4` color: #a855f7; margin: 0; min-width: 80px; `;
+const GoalText = styled.div` font-size: 18px; font-weight: bold; color: #333; flex: 1; margin-left: 20px; `;
+const TopButton = styled.button` background: white; color: #a855f7; border: 1px solid #a855f7; padding: 8px 16px; border-radius: 8px; cursor: pointer; `;
+const SectionTitle = styled.h3` width: 100%; max-width: 1000px; font-size: 18px; margin: 30px 0 20px 0; text-align: left; `;
+const ScrollContainer = styled.div` width: 100%; max-width: 1000px; display: flex; gap: 20px; overflow-x: auto; padding: 20px 10px 40px 10px; margin-bottom: 20px; min-height: 450px; align-items: flex-start; &::-webkit-scrollbar { height: 10px; } &::-webkit-scrollbar-thumb { background: #d8b4fe; border-radius: 10px; } &::-webkit-scrollbar-track { background: #f3e8ff; border-radius: 10px; } `;
+const RoadmapCard = styled.div` min-width: 320px; flex-shrink: 0; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); border: 1px solid #e9d5ff; display: flex; flex-direction: column; min-height: 400px; `;
+const CardHeader = styled.div` display: flex; align-items: center; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px; `;
+const CardHeaderBadge = styled.div` width: 25px; height: 25px; border-radius: 50%; background: #a855f7; color: white; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; flex-shrink: 0; `;
+const CardTitle = styled.h4` margin: 0; font-size: 16px; color: #333; `;
+const CardInnerStack = styled.div` display: flex; flex-direction: column; gap: 20px; `;
+const InfoBlock = styled.div``;
+const SubHeader = styled.h5` font-size: 13px; color: #7e22ce; margin-bottom: 8px; font-weight: bold; `;
+const List = styled.ul` padding-left: 18px; margin: 0; li { font-size: 13px; color: #444; margin-bottom: 5px; line-height: 1.4; } ${props => props.$check && `list-style: none; padding-left: 0; li:before { content: '✓ '; color: #ec4899; font-weight: bold; margin-right: 5px; }`} `;
+const SubjectWrap = styled.div` display: flex; gap: 5px; flex-wrap: wrap; `;
+const SubjectBadge = styled.span` background: #f3f4f6; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: #555; border: 1px solid #eee; `;
+const GapCard = styled.div` width: 100%; max-width: 1000px; background: white; padding: 30px; border-radius: 16px; border: 1px solid #eee; box-sizing: border-box; `;
+const GapGrid = styled.div` display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 25px; `;
+const GapHeader = styled.h5` margin-bottom: 12px; font-weight: bold; &.green { color: #22c55e; } &.orange { color: #f97316; } `;
+const GapItem = styled.div` margin-bottom: 12px; strong { display: block; font-size: 14px; color: #333; } span { font-size: 12px; color: #888; } `;
+const AiFeedback = styled.div` background: #fdf4ff; padding: 20px; border-radius: 12px; text-align: left; border-left: 4px solid #a855f7; strong { color: #a855f7; font-size: 15px; } p { font-size: 14px; line-height: 1.7; margin-top: 8px; color: #444; white-space: pre-line; } `;
+const NewsGrid = styled.div` width: 100%; max-width: 1000px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 15px; `;
+const NewsCard = styled.a` display: block; background: white; padding: 18px; border-radius: 12px; border: 1px solid #eee; text-decoration: none; h4 { margin: 0 0 10px 0; font-size: 14px; color: #333; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; } span { font-size: 12px; color: #a855f7; font-weight: bold; } `;
+const EmptyBox = styled.div` padding: 30px; color: #999; `;
+const FooterSpacer = styled.div` height: 60px; `;
+const LoadingContainer = styled.div` text-align: center; margin-top: 80px; `;
+const Spinner = styled.div` border: 4px solid #f3f3f3; border-top: 4px solid #a855f7; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } `;
+const LoadingText = styled.p` font-size: 18px; `;
