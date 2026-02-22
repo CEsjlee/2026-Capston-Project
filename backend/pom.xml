@@ -96,6 +96,20 @@
 			<scope>runtime</scope>
 		</dependency>
 		
+		<dependency>
+    <groupId>org.jsoup</groupId>
+    <artifactId>jsoup</artifactId>
+    <version>1.17.2</version>
+</dependency>
+		
+		
+		<!--크롤링 라이브러리-->
+		<dependency>
+    <groupId>org.jsoup</groupId>
+    <artifactId>jsoup</artifactId>
+    <version>1.17.2</version>
+</dependency>
+		
 		
 	</dependencies>
 
