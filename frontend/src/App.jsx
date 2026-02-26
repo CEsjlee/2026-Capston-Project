@@ -6,7 +6,7 @@ import Roadmap from './pages/Roadmap';
 import Activity from './pages/Activity';
 import Collaboration from './pages/Collaboration';
 import Portfolio from './pages/Portfolio';
-import Note from './pages/Note';
+import StudyNote from './pages/StudyNote';
 import Feedback from './pages/Feedback';
 import Settings from './pages/Settings';
 
@@ -30,7 +30,7 @@ function App() {
         <Route path="/activity" element={<Activity />} />
         <Route path="/collaboration" element={<Collaboration />} />
         <Route path="/portfolio" element={<Portfolio />} />
-        <Route path="/note" element={<Note />} />
+        <Route path="/notes" element={<StudyNote />} />
         <Route path="/feedback" element={<Feedback />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

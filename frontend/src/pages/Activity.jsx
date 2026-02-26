@@ -4,13 +4,14 @@ import api from '../api/axios';
 
 const Activity = () => {
   const [userInfo, setUserInfo] = useState(null);
-  const [activities, setActivities] = useState([]); 
-  const [trends, setTrends] = useState([]); 
+  const [activities, setActivities] = useState([]);
+  const [trends, setTrends] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
-  
+
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [extracurriculars, setExtracurriculars] = useState([]);
 
   // ✅ [수정됨] 데이터 로드 로직: 오직 DB만 바라봅니다.
   useEffect(() => {
@@ -18,11 +19,11 @@ const Activity = () => {
       try {
         // 1. 내 로드맵 정보(목표 직무 등) DB에서 가져오기
         const userRes = await api.get('/api/major/my-roadmap');
-        
+
         // 2. DB에 데이터가 확실히 있는 경우에만 실행
         if (userRes.data && userRes.data.targetJob) {
           setUserInfo(userRes.data);
-          
+
           // 2-1. 산업 동향 뉴스 가져오기
           fetchTrends(userRes.data.targetJob);
 
@@ -42,9 +43,12 @@ const Activity = () => {
           } else {
             setActivities([]);
           }
+
+          // 🎓 2-3. 학교 비교과 프로그램 불러오기
+          fetchExtracurriculars(userRes.data.major, userRes.data.grade);
+
         } else {
           // 3. DB에 데이터가 없으면(신규 유저) 화면을 깨끗하게 비움
-          // 절대 로컬스토리지(이전 유저 흔적)를 확인하지 않음
           handleClearAll();
         }
 
@@ -58,39 +62,66 @@ const Activity = () => {
     fetchInitialData();
   }, []);
 
+  // 🎓 학교 비교과 프로그램 가져오기
+  const fetchExtracurriculars = async (major, grade) => {
+    try {
+      if (!major || !grade) return;
+
+      const res = await api.get(
+        `/api/tukorea/extracurriculars?major=${encodeURIComponent(major)}&grade=${encodeURIComponent(grade)}`
+      );
+
+      const mapped = res.data.map((item, index) => ({
+        id: `extra-${index}`,
+        type: '비교과',
+        title: item.title,
+        organizer: `${item.major} · ${item.grade}`,
+        desc: `등록일: ${item.date}`,
+        tags: ['학교프로그램'],
+        link: item.link,
+        isExtracurricular: true
+      }));
+
+      setExtracurriculars(mapped);
+    } catch (e) {
+      console.error("비교과 로딩 실패", e);
+    }
+  };
+
   // 화면 초기화 함수
   const handleClearAll = () => {
     setUserInfo(null);
     setActivities([]);
     setTrends([]);
-    // 혹시 남아있을 수 있는 이전 사용자의 로컬스토리지 흔적 삭제
+    setExtracurriculars([]);
     localStorage.removeItem('roadmapInputs');
     localStorage.removeItem('roadmapResult');
   };
 
   const convertCategoryToType = (category) => {
-    switch(category) {
-        case 'CONTEST': return '공모전';
-        case 'INTERN': return '채용';
-        case 'LICENSE': return '자격증';
-        default: return '대외활동';
+    switch (category) {
+      case 'CONTEST': return '공모전';
+      case 'INTERN': return '채용';
+      case 'LICENSE': return '자격증';
+      default: return '대외활동';
     }
   };
 
   const fetchTrends = async (job) => {
     try {
-        if(!job) return;
-        const keyword = encodeURIComponent(job + " 채용 동향");
-        const newsRes = await api.get(`/api/news/search?keyword=${keyword}`);
-        setTrends(newsRes.data);
-    } catch(e) { console.error("뉴스 로딩 실패", e); }
-  }
+      if (!job) return;
+      const keyword = encodeURIComponent(job + " 채용 동향");
+      const newsRes = await api.get(`/api/news/search?keyword=${keyword}`);
+      setTrends(newsRes.data);
+    } catch (e) {
+      console.error("뉴스 로딩 실패", e);
+    }
+  };
 
   const handleRecommend = async () => {
-    // 추천 버튼을 누를 때도 화면에 로드된 userInfo(DB 데이터)를 기준으로 함
-    if (!userInfo || !userInfo.targetJob) { 
-        alert("먼저 '로드맵' 탭에서 정보를 입력하고 저장해주세요!"); 
-        return; 
+    if (!userInfo || !userInfo.targetJob) {
+      alert("먼저 '로드맵' 탭에서 정보를 입력하고 저장해주세요!");
+      return;
     }
 
     setLoading(true);
@@ -109,7 +140,9 @@ const Activity = () => {
       fetchTrends(userInfo.targetJob);
     } catch (error) {
       alert("추천 중 오류가 발생했습니다.");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openDetail = (activity) => {
@@ -117,7 +150,13 @@ const Activity = () => {
     setIsModalOpen(true);
   };
 
-  const filtered = activeTab === 'ALL' ? activities : activities.filter(i => i.type === activeTab);
+  // 🔥 AI 추천 + 비교과 통합
+  const mergedList = [...activities, ...extracurriculars];
+
+  const filtered =
+    activeTab === 'ALL'
+      ? mergedList
+      : mergedList.filter(i => i.type === activeTab);
 
   return (
     <MainContent>
@@ -132,79 +171,115 @@ const Activity = () => {
       </HeaderRow>
 
       <FilterContainer>
-        {['ALL', '공모전', '대외활동', '자격증', '채용'].map(tab => (
-          <FilterButton key={tab} $active={activeTab === tab} onClick={() => setActiveTab(tab)}>{tab === 'ALL' ? '전체' : tab}</FilterButton>
+        {['ALL', '공모전', '대외활동', '자격증', '채용', '비교과'].map(tab => (
+          <FilterButton
+            key={tab}
+            $active={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab === 'ALL' ? '전체' : tab}
+          </FilterButton>
         ))}
       </FilterContainer>
-      
+
       <ContentGrid>
         <LeftColumn>
-          {activities.length === 0 && !loading && (
-             <EmptyStateBox>
-                <p>아직 추천된 활동이 없습니다.</p>
-                <p style={{fontSize: '14px', marginBottom: '20px'}}>내 로드맵 정보를 바탕으로 딱 맞는 활동을 찾아보세요!</p>
-                <StartButton onClick={handleRecommend}>🚀 AI 활동 추천 시작하기</StartButton>
-             </EmptyStateBox>
+
+          {filtered.length === 0 && !loading && (
+            <EmptyStateBox>
+              <p>아직 추천된 활동이 없습니다.</p>
+              <p style={{ fontSize: '14px', marginBottom: '20px' }}>
+                내 로드맵 정보를 바탕으로 딱 맞는 활동을 찾아보세요!
+              </p>
+              <StartButton onClick={handleRecommend}>
+                🚀 AI 활동 추천 시작하기
+              </StartButton>
+            </EmptyStateBox>
           )}
 
           {!loading && filtered.map((item) => (
             <ActivityCard key={item.id}>
               <CardHeader>
-                <IconWrapper type={item.type}>{item.type === '공모전' ? '🏆' : item.type === '자격증' ? '📜' : '💼'}</IconWrapper>
-                <CardInfo><CardTitle>{item.title}</CardTitle><CardOrganizer>{item.organizer}</CardOrganizer></CardInfo>
-                <Badge type={item.type}>{item.type}</Badge>
+                <IconWrapper>
+                  {item.type === '공모전' ? '🏆' :
+                    item.type === '자격증' ? '📜' :
+                      item.type === '비교과' ? '🎓' : '💼'}
+                </IconWrapper>
+                <CardInfo>
+                  <CardTitle>{item.title}</CardTitle>
+                  <CardOrganizer>{item.organizer}</CardOrganizer>
+                </CardInfo>
+                <Badge>{item.type}</Badge>
               </CardHeader>
-              <CardDesc>{item.desc.substring(0, 80)}...</CardDesc>
+
+              <CardDesc>{item.desc?.substring(0, 80)}...</CardDesc>
+
               <TagRow>
-                <Tags>{item.tags && item.tags.map((t, i) => <Tag key={i}>#{t}</Tag>)}</Tags>
-                <DetailButton onClick={() => openDetail(item)}>상세 코칭 ↗</DetailButton>
+                <Tags>
+                  {item.tags && item.tags.map((t, i) =>
+                    <Tag key={i}>#{t}</Tag>
+                  )}
+                </Tags>
+
+                {item.type === '비교과' ? (
+                  <DetailButton as="a" href={item.link} target="_blank">
+                    상세 보기 ↗
+                  </DetailButton>
+                ) : (
+                  <DetailButton onClick={() => openDetail(item)}>
+                    상세 코칭 ↗
+                  </DetailButton>
+                )}
               </TagRow>
             </ActivityCard>
           ))}
-          {loading && <LoadingBox><Spinner /><p>AI가 사용자 맞춤 활동을 검색 중입니다...</p></LoadingBox>}
+
+          {loading && (
+            <LoadingBox>
+              <Spinner />
+              <p>AI가 사용자 맞춤 활동을 검색 중입니다...</p>
+            </LoadingBox>
+          )}
+
         </LeftColumn>
 
         <RightColumn>
-            <SectionHeader style={{color:'#7e22ce'}}>📈 실시간 동향</SectionHeader>
-            {trends.length > 0 ? trends.map((t, i) => (
-              <TrendCard key={i} href={t.link} target="_blank">
-                <TrendTitle dangerouslySetInnerHTML={{ __html: t.title }} />
-                <TrendFooter><span>{t.publishedAt?.substring(0, 10) || '최신'}</span></TrendFooter>
-              </TrendCard>
-            )) : (
-              <TrendEmptyBox>
-                  {userInfo?.targetJob ? '관련 뉴스를 불러오는 중입니다...' : '로드맵을 먼저 작성해주세요.'}
-              </TrendEmptyBox>
-            )}
+          <SectionHeader style={{ color: '#7e22ce' }}>
+            📈 실시간 동향
+          </SectionHeader>
+
+          {trends.length > 0 ? trends.map((t, i) => (
+            <TrendCard key={i} href={t.link} target="_blank">
+              <TrendTitle dangerouslySetInnerHTML={{ __html: t.title }} />
+              <TrendFooter>
+                <span>{t.publishedAt?.substring(0, 10) || '최신'}</span>
+              </TrendFooter>
+            </TrendCard>
+          )) : (
+            <TrendEmptyBox>
+              {userInfo?.targetJob
+                ? '관련 뉴스를 불러오는 중입니다...'
+                : '로드맵을 먼저 작성해주세요.'}
+            </TrendEmptyBox>
+          )}
         </RightColumn>
       </ContentGrid>
-      
-      {isModalOpen && selectedActivity && (
+
+      {isModalOpen && selectedActivity && selectedActivity.type !== '비교과' && (
         <ModalOverlay onClick={() => setIsModalOpen(false)}>
           <ModalContent onClick={e => e.stopPropagation()}>
-            <CloseButton onClick={() => setIsModalOpen(false)}>&times;</CloseButton>
+            <CloseButton onClick={() => setIsModalOpen(false)}>
+              &times;
+            </CloseButton>
             <ModalHeader>
-                <Badge type={selectedActivity.type}>{selectedActivity.type}</Badge>
-                <ModalTitle>{selectedActivity.title}</ModalTitle>
-                <ModalOrganizer>{selectedActivity.organizer}</ModalOrganizer>
+              <Badge>{selectedActivity.type}</Badge>
+              <ModalTitle>{selectedActivity.title}</ModalTitle>
+              <ModalOrganizer>{selectedActivity.organizer}</ModalOrganizer>
             </ModalHeader>
             <ModalSection>
-                <SectionLabel>💡 AI 추천 가이드</SectionLabel>
-                <SectionText>{selectedActivity.desc}</SectionText>
+              <SectionLabel>💡 AI 추천 가이드</SectionLabel>
+              <SectionText>{selectedActivity.desc}</SectionText>
             </ModalSection>
-            <ModalSection>
-                <SectionLabel>🚩 준비 전략</SectionLabel>
-                <StrategyList>
-                    <li>현재 <strong>{userInfo?.grade || '학년'}</strong>이신 점을 고려할 때, 이 활동은 포트폴리오의 핵심이 될 수 있습니다.</li>
-                    <li><strong>{userInfo?.techStacks || '관심 기술'}</strong> 관련 역량을 강조하여 지원서를 작성해보세요.</li>
-                    <li>이 활동은 사용자의 목표 직무인 <strong>{userInfo?.targetJob}</strong> 역량 강화에 최적화되어 있습니다.</li>
-                </StrategyList>
-            </ModalSection>
-            <ModalFooter>
-                <LinkButton href={selectedActivity.link} target="_blank">
-                  🔍 구글에서 상세 정보 검색하기
-                </LinkButton>
-            </ModalFooter>
           </ModalContent>
         </ModalOverlay>
       )}
@@ -213,6 +288,7 @@ const Activity = () => {
 };
 
 export default Activity;
+
 
 // --- 스타일 컴포넌트 ---
 const MainContent = styled.div` flex: 1; padding: 40px; overflow-y: auto; height: 100vh; box-sizing: border-box; background-color: #f8f9fa; `;
