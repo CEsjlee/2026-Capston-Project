@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // 1. 기본 설정
-const BASE_URL = 'http://43.201.97.xxx:8080'; 
+const BASE_URL = 'http://43.201.xxx.xxx:8080'; 
 
 const api = axios.create({
   baseURL: BASE_URL,

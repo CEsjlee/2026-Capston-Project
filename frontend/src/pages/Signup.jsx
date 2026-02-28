@@ -64,7 +64,7 @@ const Signup = () => {
       <SignupWrapper>
         <Logo>🎓 대학생 맞춤 진로 도우미</Logo>
         <Title>회원가입</Title>
-        <SubText>3초 만에 빠르게 가입하고 시작하세요</SubText>
+        <SubText>회원정보를 입력하세요.</SubText>
         
         <FormArea>
           <Input label="이름" name="name" placeholder="이름을 입력하세요" value={formData.name} onChange={handleChange} />

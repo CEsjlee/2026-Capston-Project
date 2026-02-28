@@ -9,6 +9,7 @@ import Portfolio from './pages/Portfolio';
 import StudyNote from './pages/StudyNote';
 import Feedback from './pages/Feedback';
 import Settings from './pages/Settings';
+import FindPassword from "./pages/FindPassword";
 
 // [주의] 이제 Onboarding은 Roadmap 페이지 안으로 통합되었으므로 여기서 부를 필요가 없습니다.
 
@@ -21,6 +22,7 @@ function App() {
       {/* 독립 페이지 (로그인, 회원가입) */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/find-password" element={<FindPassword />} />
       
       {/* 레이아웃이 적용되는 내부 페이지들 */}
       <Route element={<Layout />}>
