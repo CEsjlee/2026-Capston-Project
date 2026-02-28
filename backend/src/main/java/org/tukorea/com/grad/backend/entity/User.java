@@ -29,4 +29,9 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     private Role role; // 권한 (USER, ADMIN) - 아래에서 Enum 만들 예정
+
+    // 🔥 [추가된 부분] 임시 비밀번호 발급 등 비밀번호 변경을 위한 안전한 메서드 추가
+    public void setPassword(String password) {
+        this.password = password;
+    }
 }

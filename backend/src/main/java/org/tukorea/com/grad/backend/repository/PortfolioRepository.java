@@ -7,4 +7,7 @@ import java.util.Optional;
 
 public interface PortfolioRepository extends JpaRepository<Portfolio, Long> {
     Optional<Portfolio> findByUser(User user);
+
+    // 회원 탈퇴 시 삭제 메소드
+    void deleteByUser(org.tukorea.com.grad.backend.entity.User user);
 }

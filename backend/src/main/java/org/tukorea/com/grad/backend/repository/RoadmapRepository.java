@@ -11,4 +11,7 @@ public interface RoadmapRepository extends JpaRepository<Roadmap, Long> {
     // 특정 사용자의 로드맵 정보를 하나 찾아오는 함수입니다.
     // 이 함수 이름만 보고 스프링이 "SELECT * FROM roadmap WHERE user_id = ?" 쿼리를 자동으로 만듭니다.
     Optional<Roadmap> findByUser(User user);
+
+    // 회원 탈퇴 시 삭제 메소드
+    void deleteByUser(org.tukorea.com.grad.backend.entity.User user);
 }

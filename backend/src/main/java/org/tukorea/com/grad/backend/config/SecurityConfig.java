@@ -43,8 +43,13 @@ public class SecurityConfig {
                 // [B팀원 추가] Preflight(OPTIONS) 요청 전체 허용
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
                 
-                // [공통] 로그인, 회원가입 관련 엔드포인트 누구나 접근 가능
-                .requestMatchers("/api/auth/**", "/api/user/**").permitAll() 
+                // 🔥 [보안 수정됨] 비밀번호 변경(change-password)과 회원탈퇴는 인증이 필요하므로, 딱 가입/로그인 2개만 명시적 허용!
+                .requestMatchers(
+                        "/api/auth/signup", 
+                        "/api/auth/login",
+                        "/api/auth/check-user",
+                        "/api/auth/reset-password"
+                ).permitAll() 
                 
                 // [A팀원] 뉴스 검색은 비로그인 상태에서도 허용
                 .requestMatchers("/api/news/**").permitAll()
@@ -53,7 +58,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/major/**", "/api/notes/**", "/api/ai/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
 
-                // [A팀원 핵심] 그 외 모든 요청(활동 추천 등)은 로그인(인증) 필수!
+                // [A팀원 핵심] 회원 탈퇴, 비밀번호 변경을 포함한 그 외 모든 요청은 로그인(인증) 필수!
                 .anyRequest().authenticated()
             )
             // [B팀원 추가] H2-Console 사용을 위한 FrameOptions 설정
@@ -73,7 +78,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:3000", 
             "http://localhost:5173", 
-            "http://43.201.97.xxx" 
+            "http://43.201.xxx.xxx" 
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
