@@ -180,11 +180,11 @@ public class MajorService {
             headers.setBearerAuth(apiKey);
 
             Map<String, Object> body = new HashMap<>();
-            body.put("model", "gpt-4o-mini");
+            body.put("model", "gpt-4o");
             body.put("messages", Arrays.asList(
                     Map.of("role", "system", "content", systemRole),
                     Map.of("role", "user", "content", userPrompt)));
-            body.put("temperature", 0.4);
+            body.put("temperature", 0.2);
             body.put("response_format", Map.of("type", "json_object")); // 필수: JSON 형식 강제
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);

@@ -105,14 +105,14 @@ public class StudyNoteService {
                             "\n위의 노트 내용을 바탕으로 친절하고 자세하게 답변해줘.";
 
             Map<String, Object> body = new HashMap<>();
-            body.put("model", "gpt-3.5-turbo"); 
+            body.put("model", "gpt-4o"); 
             
             List<Map<String, String>> messages = new ArrayList<>();
             messages.add(Map.of("role", "system", "content", "당신은 컴퓨터공학 전공 튜터입니다."));
             messages.add(Map.of("role", "user", "content", prompt));
             
             body.put("messages", messages);
-            body.put("temperature", 0.7);
+            body.put("temperature", 0.2);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
