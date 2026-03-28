@@ -80,7 +80,7 @@ public class TukoreaService {
                     .timeout(10000)
                     .get();
 
-            // ===== 1️⃣ 등록일 =====
+            // ===== 등록일 =====
             Element dateElement =
                     detailDoc.selectFirst("dt:contains(등록일) + dd");
 
@@ -88,7 +88,7 @@ public class TukoreaService {
                     ? dateElement.text().trim()
                     : "날짜 정보 없음";
 
-            // ===== 2️⃣ 본문 내용 =====
+            // ===== 본문 내용 =====
             Element contentElement =
                     detailDoc.selectFirst(".view-con");
 
@@ -96,7 +96,20 @@ public class TukoreaService {
                     ? contentElement.text().trim()
                     : "";
 
-            // ===== 3️⃣ 이미지 =====
+            // ===== 학과 필터링 =====
+            List<String> keywords = List.of(
+                    major,
+                    "취업",
+                    "포트폴리오",
+                    "토익"
+            );
+
+            boolean related = keywords.stream()
+                    .anyMatch(k -> title.contains(k) || content.contains(k));
+
+            if (!related) return null;
+
+            // ===== 이미지 =====
             Element imgElement =
                     detailDoc.selectFirst(".view-con img");
 
@@ -110,7 +123,7 @@ public class TukoreaService {
                         : BASE_URL + src;
             }
 
-            // ===== 4️⃣ DTO 생성 (Builder 방식) =====
+            // ===== DTO 생성 =====
             return TukoreaNoticeDto.builder()
                     .title(title)
                     .date(date)
